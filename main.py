@@ -30,5 +30,4 @@ def main():
     starred_tracks = get_starred_tracks(sp, user)
     print starred_tracks
 
-
 if __name__ == "__main__" : main()
