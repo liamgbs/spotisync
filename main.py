@@ -26,28 +26,39 @@ def get_starred_tracks(sp, user):
     tracklist = []
     while tracks_paging:
         star_tracks = tracks_paging['items'] # list containing all tracks as playlist track objects
-        for playlisttrack in star_tracks:
-            tracklist.append( (playlisttrack['added_at'], str(playlisttrack['track']['id']), playlisttrack['track']['name']) )
+        for playlist_track in star_tracks:
+            tracklist.append( (playlist_track['added_at'], str(playlist_track['track']['id'])) )
         tracks_paging = sp.next(tracks_paging)
+    return tracklist
+
+def get_my_music_tracks(sp):
+    limit, offset = 50, 0
+    tracklist = []
+    my_music = sp.current_user_saved_tracks(limit, offset)
+    while my_music['items']:  # while tracks are being returned
+        for playlist_track in my_music['items']:
+            tracklist.append( (playlist_track['added_at'], str(playlist_track['track']['id'])) )
+        offset += 50
+        my_music = sp.current_user_saved_tracks(limit, offset)
     return tracklist
 
 def is_track_older_than(track, age_days=7):
     assert isinstance(track, tuple)
     spotify_format = "%Y-%m-%dT%H:%M:%SZ"
-    track_date = datetime.strptime(track[0], spotify_format)
+    track_date = datetime.strptime(track[0], spotify_format) # convert unicode to python datetime object
     if not (datetime.now() - track_date).days > age_days: # if delta of todays date and track add date > 7 (?)
         return True
     else:
         return False
 
+
+
 def main():
     user = get_username()
     sp = spotipy.Spotify(auth=get_token(user))
     starred_tracks = get_starred_tracks(sp, user)
-
-    for t in starred_tracks:
-        print t[2]
-        print is_track_older_than(t)
-    print len(starred_tracks)
+    my_music_tracks = get_my_music_tracks(sp)
+    pprint( my_music_tracks)
+    print len(my_music_tracks)
 
 if __name__ == "__main__" : main()
