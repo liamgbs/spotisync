@@ -2,7 +2,14 @@ import spotipy
 import spotipy.util as sutil
 import sys
 from datetime import datetime
-from pprint import pprint
+
+
+class AuthException(Exception):
+    pass
+
+
+class TrackPresentException(Exception):
+    pass
 
 
 def get_username():
@@ -21,8 +28,9 @@ def get_token(user):
     token = sutil.prompt_for_user_token(user, scope, clientid,
                                         clientsecret, redirecturi)
     if not token:
-        raise Exception("No Auth2.0 token present")
-    return token
+        raise AuthException("Auth Token Failed")
+    else:
+        return token
 
 
 def get_starred_tracks(sp, user):
@@ -51,7 +59,7 @@ def get_my_music_tracks(sp):
     return tracklist
 
 
-def is_track_older_than(track, age_days=7):
+def is_track_older_than(track, age_days=14):
     assert isinstance(track, tuple)
     spotify_format = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -84,13 +92,20 @@ def get_unsynced_starred(old_starred_tracks, my_music_tracks):
     return list(unsynced)
 
 
+def sync_with_starred(sp, unsynced):
+    if True in sp.current_user_saved_tracks_contains(unsynced):
+        raise TrackPresentException("ERROR: Track already present")
+    else sp.current_user_saved_tracks_add(unsynced)
+
+
 def main():
     user = get_username()
     sp = spotipy.Spotify(auth=get_token(user))
     my_music_tracks = get_my_music_tracks(sp)
     starred_tracks = get_old_starred(sp, user)
     unsynced = get_unsynced_starred(starred_tracks, my_music_tracks)
-    pprint(unsynced)
+    sync_with_starred(sp, unsynced)
+
 
 if __name__ == "__main__":
     main()
