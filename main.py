@@ -2,6 +2,7 @@ import spotipy
 import spotipy.util as sutil
 import sys
 from datetime import datetime
+from pprint import pprint
 
 
 class AuthException(Exception):
@@ -21,7 +22,7 @@ def get_username():
 
 
 def get_token(user):
-    scope = 'playlist-read-private'
+    scope = 'playlist-modify-private'
     clientid = '26637fb0e85141fcb215898a91eb5a84'
     clientsecret = 'c2f01d25d82f4e42941cf1f7e503b643'
     redirecturi = 'http://example.com/callback/'
@@ -81,31 +82,71 @@ def get_old_starred(sp, user):
     return starred_tracks
 
 
-def get_unsynced_starred(old_starred_tracks, my_music_tracks):
+def get_unsynced(track_list_one, track_list_two):
     t1, t2 = [], []
-    t1 = [x[1] for x in old_starred_tracks]
-    t2 = [x[1] for x in my_music_tracks]
+    t1 = [x[1] for x in track_list_one]
+    t2 = [x[1] for x in track_list_two]
     unsynced = set(t1).difference(set(t2))
 
-    # remove all None values
+    # remove all None values (for old playlists)
     unsynced = [x for x in unsynced if x is not None]
     return list(unsynced)
 
 
+def get_playlist_id_by_name(sp, user, playlist_name):
+    playlists = sp.user_playlists(user)['items']
+    for pl in playlists:
+        if pl['name'] == playlist_name:
+            return pl['id']
+    return None
+
+
+def get_stash_playlist_id(sp, user, stash_name='spotisync'):
+    stash_id = get_playlist_id_by_name(sp, user, stash_name)
+    # if stash playlist doesnt exist
+    if stash_id is None:
+        sp.user_playlist_create(user, stash_name, public=False)
+        return get_playlist_id_by_name(sp, user, stash_name)
+    else:
+        return stash_id
+
+
 def sync_with_starred(sp, unsynced):
+    # if list is empty, no tracks to sync
+    if len(unsynced) == 0:
+        print "No new tracks to add from starred"
+        return
+
     if True in sp.current_user_saved_tracks_contains(unsynced):
         raise TrackPresentException("ERROR: Track already present")
-    else sp.current_user_saved_tracks_add(unsynced)
+    else:
+        sp.current_user_saved_tracks_add(unsynced)
+
+
+def sync_with_music(sp, user, unsynced):
+    if len(unsynced) == 0:
+        print "No new tracks to stash and remove from music."
+        return
+
+    stash_id = get_stash_playlist_id(sp, user)
+    pprint(unsynced)
+    sp.user_playlist_add_tracks(user, stash_id, unsynced)
+    sp.current_user_saved_tracks_delete(unsynced)
 
 
 def main():
+    # Auth
     user = get_username()
     sp = spotipy.Spotify(auth=get_token(user))
+    # Get all tracks needed
     my_music_tracks = get_my_music_tracks(sp)
     starred_tracks = get_old_starred(sp, user)
-    unsynced = get_unsynced_starred(starred_tracks, my_music_tracks)
-    sync_with_starred(sp, unsynced)
-
+    # Add old starred tracks to my music
+    unsynced_with_starred = get_unsynced(starred_tracks, my_music_tracks)
+    sync_with_starred(sp, unsynced_with_starred)
+    # Stash and remove tracks in my music that dont appear in starred
+    unsynced_with_music = get_unsynced(my_music_tracks, starred_tracks)
+    sync_with_music(sp, user, unsynced_with_music)
 
 if __name__ == "__main__":
     main()
