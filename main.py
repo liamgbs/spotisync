@@ -2,7 +2,6 @@ import spotipy
 import spotipy.util as sutil
 import sys
 from datetime import datetime
-from pprint import pprint
 
 
 class AuthException(Exception):
@@ -120,7 +119,9 @@ def sync_with_starred(sp, unsynced):
     if True in sp.current_user_saved_tracks_contains(unsynced):
         raise TrackPresentException("ERROR: Track already present")
     else:
+        print "Adding %i tracks to your music..." % len(unsynced)
         sp.current_user_saved_tracks_add(unsynced)
+        print "Done."
 
 
 def sync_with_music(sp, user, unsynced):
@@ -129,9 +130,10 @@ def sync_with_music(sp, user, unsynced):
         return
 
     stash_id = get_stash_playlist_id(sp, user)
-    pprint(unsynced)
+    print "Stashing & removing %i tracks from your music..." % len(unsynced)
     sp.user_playlist_add_tracks(user, stash_id, unsynced)
     sp.current_user_saved_tracks_delete(unsynced)
+    print "Done."
 
 
 def main():
